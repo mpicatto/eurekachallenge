@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Marvel's Heroes & Villans</title>
+  <link rel="stylesheet" href="assets/css/style.css" >
+</head>
+<body>
+  <header class="header">
+    <img src="assets/header/logo.jpg" class="logo"/>
+    <h1 class="title">Heroes & Villans</h1>
+  </header>
+  <main>
+    <div class="container">
+      <div class="page"></div>
+    </div>
+  </main>
+  <footer class="footer">
+    <h6 class="text">Realizado por Mauro Picatto para:</h6>
+    <img src="assets/footer/eureka-labs_logo_color.png" class="logo"/>
+  </header>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.8.2/jquery.min.js" type="text/javascript"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.4.2/underscore-min.js" type="text/javascript"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/backbone.js/0.9.2/backbone-min.js"></script>
+
+  <script type="text/template" id="caracters-list-template">
+
+    <div class="caracter-list-header">
+      <h1 class="caracter-list-title">Caracters List</h1>
+      <form class="search-form">
+        <input type="text" name="nameSearch" class="searchInput" />
+        <button type="button" class="searchButton" >Search</button>
+      </form>
+    </div>
+
+    <div class='caracters-cards'>
+      <%
+      var currentPage = caracters.offset/8 + 1;
+      var totalPages = Math.ceil(caracters.total / caracters.limit )
+    _.each(caracters.results, function(caracter,index) {
+      var imgUrl = caracter.thumbnail.path + "/standard_large." + caracter.thumbnail.extension 
+       %>
+        <div class="caracter-card">
+          <div class="image-container">
+            <a href="#/details/<%= index %>" ><img src=<%= imgUrl %> class="caracter-card-img" /></a>
+          </div>
+          <div class="name-container">
+            <a href="#/details/<%= index %>" class="caracter-card-name" ><%= caracter.name %></a>
+          </div>
+        </div>
+        
+
+       <% }); %>
+      </div>
+       <% if (!name){ %>
+       <div class="page-controls">
+        <a class="btn pFirst" href="#/1" ><Button class="page-btn">First</button></a>
+        <a class="btn pPrev" href="#/<%= currentPage>1 ? currentPage - 1:currentPage %>" ><Button class="page-btn">Prev.</button></a>
+        <p class="page-indicator">Page <%= currentPage %> of <%=totalPages %></p>  
+        <a class="btn pNext" href="#/<%= currentPage==totalPages ? currentPage:currentPage+ 1 %>" ><Button class="page-btn">Next</button></a>
+        <a class="btn pLast" href="#/<%= totalPages%>" ><Button class="page-btn">Last</button></a>
+      </div>
+      <% }else{%>
+        <div class="page-controls"> 
+        <a class="btn" href="#/1"><Button class="page-btn"> List All </button></a> 
+        </div>
+        <% }%>
+
+    </div>
+  </script>
+
+  <script type="text/template" id="caracter-details-template">
+    
+    
+    <div class="caracter-list-header">
+      <h1 class="caracter-list-title">Caracter Details</h1>
+    </div>
+    
+    <% if (!caracter){
+      window.history.back() 
+      return}; 
+    var imgUrl = caracter.thumbnail.path + "/portrait_incredible." + caracter.thumbnail.extension; %>
+
+    <div class="caracter-detail-card">
+      <div class="img-container">
+        <img class="detail-image" src=<%= imgUrl %> />
+      </div>
+      <div class="data-container">
+        <div class="name-container"><h2 class="detail-name"><%= caracter.name %></h2></div>
+        <div class="description-container"><h3 class="detail-description"><%= caracter.description ?caracter.description : "Description not available" %></h3></div>
+      </div>
+    </div>
+    <div class="page-controls"> 
+    <button class="page-btn hBack">Back to List</button>
+    </div>
+  
+  </script>
+
+  <script>
+
+    // GET request parameters
+    var marvelUrl = "https://gateway.marvel.com:443/v1/public/characters?"
+    var ts = "thesoer";
+    var apikey = "001ac6c73378bbfff488a36141458af2";
+    var hash = "72e5ed53d1398abb831c3ceec263f18b";
+    var baseUrl = marvelUrl+'ts=' + ts + '&apikey=' + apikey + "&hash=" + hash;
+
+    $.ajaxPrefilter( function( options, originalOptions, jqXHR ) {
+      options.url =  marvelUrl+'ts=' + ts + '&apikey=' + apikey + "&hash=" + hash + options.url;
+      options.crossDomain=true;
+    });
+    
+
+    //Current caracter listed
+    var caracterArray =[];
+
+    //Get Caracter Collection 
+    var Caracters = Backbone.Collection.extend({
+      initialize:function(options){
+        options.id? this.id = (options.id -1)*8:this.id=0;
+        options.name? this.name=options.name:null;
+        options.name? this.limit=100:this.limit=8
+      },
+      url: function(){
+        var query = ""
+        if(this.name){
+          query = "&nameStartsWith=" + this.name + "&offset=" + this.id + "&limit=" + this.limit
+        }else{
+          query = "&offset=" + this.id + "&limit=" + this.limit
+        }
+        return query
+      },
+    });
+    
+
+    //Views
+    var CaractersListView = Backbone.View.extend({
+      el: '.page',
+      initialize:function(){
+        this.searched=''
+      },
+      events:{
+        'click .searchButton':'search'
+      },
+      search:function(ev){
+        var searched = $('.searchInput').val().toLowerCase();
+        var searchUrl = '#/search/'+searched;
+        router.navigate(searchUrl) 
+      },
+      render: function (options) {
+          var that = this;
+          var caracters = new Caracters({id:options.page, name:options.name});
+          caracters.fetch({
+            success: function (caracters) {
+              caracterArray = caracters.models[0].attributes.data.results;
+              var template = _.template($('#caracters-list-template').html(), {caracters: caracters.models[0].attributes.data, name:options.name});
+              that.$el.html(template);
+            }
+          }) 
+      }
+    });
+
+    var caractersListView = new CaractersListView();
+
+    var CaracterEditView = Backbone.View.extend({
+      el: '.page',
+      events:{
+        'click .hBack':'back'
+      },
+      back:function(ev){
+        window.history.back()
+      },
+      render: function (options) {
+        var that = this;
+        var template = _.template($('#caracter-details-template').html(), {caracter: caracterArray[options.id]});
+        that.$el.html(template);
+      }
+    });
+
+    var caracterEditView = new CaracterEditView();
+
+    //Router
+
+    var Router = Backbone.Router.extend({
+        routes: {
+          "": "home",
+          ":page":"page",
+          "search/:name":"search", 
+          "details/:id": "details",
+        }
+    });
+
+    var router = new Router;
+    router.on('route:home', function(page) {
+      // render user list
+      caractersListView.render({page:1});
+    })
+    router.on('route:page', function(page) {
+      // render user list
+      caractersListView.render({page:page});
+    })
+    router.on('route:search', function(name) {
+      // render user list
+      caractersListView.render({name:name});
+    })
+    router.on('route:details', function(id) {
+      caracterEditView.render({id: id});
+    })
+    Backbone.history.start();
+  </script>
+</body>
+</html> 
